@@ -1,0 +1,13 @@
+{
+  "sqltools.connections": [
+    {
+      "name": "BigQuery",
+      "authenticator": "CLI",
+      "location": "europe-west3",
+      "previewLimit": 50,
+      "driver": "BigQuery",
+      "projectId": "earnest-sandbox-435116-s3"
+    }
+  ],
+  "sqltools.useNodeRuntime": true
+}
