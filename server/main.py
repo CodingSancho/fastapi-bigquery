@@ -20,9 +20,12 @@ class User(BaseModel):
     name: str
     email: str
 
-project_id = ""
-dataset_id = ""
-table_id = ""
+class UserUpdate(BaseModel):
+    name: str
+
+project_id = "earnest-sandbox-435116-s3"
+dataset_id = "sacho_test"
+table_id = "user_details"
 
 @app.get("/")
 def read_root():
@@ -61,11 +64,59 @@ async def create_user(user: User):
     }]
 
     try:
-        # Insert rows into BigQuery table
         errors = client.insert_rows_json(table, rows_to_insert)
         if errors:
             raise HTTPException(status_code=500, detail=f"Error inserting rows: {errors}")
         return {"message": "New user created successfully"}
     except GoogleAPIError as e:
-        # Handle Google Cloud API errors
+        raise HTTPException(status_code=500, detail=f"BigQuery Error: {str(e)}")
+    
+@app.put("/update_user/{email}")
+async def update_user(email: str, user_update: UserUpdate):
+    query = f"""
+    UPDATE `{project_id}.{dataset_id}.{table_id}`
+    SET name = @name
+    WHERE email = @email
+    """
+    
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("name", "STRING", user_update.name),
+            bigquery.ScalarQueryParameter("email", "STRING", email),
+        ]
+    )
+    
+    try:
+        query_job = client.query(query, job_config=job_config)
+        query_job.result()
+        
+        if query_job.num_dml_affected_rows == 0:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        return {"message": "User updated successfully"}
+    except GoogleCloudError as e:
+        raise HTTPException(status_code=500, detail=f"BigQuery Error: {str(e)}")
+
+@app.delete("/delete_user/{email}")
+async def delete_user(email: str):
+    query = f"""
+    DELETE FROM `{project_id}.{dataset_id}.{table_id}`
+    WHERE email = @email
+    """
+    
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("email", "STRING", email),
+        ]
+    )
+    
+    try:
+        query_job = client.query(query, job_config=job_config)
+        query_job.result()
+        
+        if query_job.num_dml_affected_rows == 0:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        return {"message": "User deleted successfully"}
+    except GoogleCloudError as e:
         raise HTTPException(status_code=500, detail=f"BigQuery Error: {str(e)}")
